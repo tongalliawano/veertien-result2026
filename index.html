@@ -225,6 +225,16 @@ select option{ background: #fff; }
   border-radius: var(--radius-sm);
 }
 .btn-outline:hover{ background: rgba(223,91,48,.06); }
+.btn-reset{
+  background: transparent;
+  border: 1.5px solid rgba(0,0,0,.18);
+  color: var(--ink3);
+  width: 100%;
+  height: 40px;
+  font-size: .82rem;
+  border-radius: var(--radius-sm);
+}
+.btn-reset:hover{ border-color:#e03535; color:#e03535; background:rgba(224,53,53,.05); }
 
 .btn-icon{
   background: transparent;
@@ -451,6 +461,7 @@ canvas#scoreCard{
   </div>
 
   <button class="btn btn-primary" onclick="generate()">▶ 生成する</button>
+  <button class="btn btn-reset" onclick="confirmReset()" style="margin-top:10px;">↺ 記入をリセット</button>
 
   <div id="outputWrap" style="display:none;">
     <div class="output-grid">
@@ -466,6 +477,31 @@ canvas#scoreCard{
   </div>
 
 </div>
+</div>
+
+<!-- ── リセット確認モーダル ── -->
+<div id="resetModal" style="
+  display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,.45); align-items:center; justify-content:center;">
+  <div style="
+    background:#fff; border-radius:14px; padding:28px 24px; max-width:320px; width:90%;
+    box-shadow:0 8px 32px rgba(0,0,0,.18); text-align:center;">
+    <p style="font-size:.95rem; font-weight:500; color:#1a1a1a; margin-bottom:20px; line-height:1.6;">
+      記入した記録をリセットしてもよろしいですか？
+    </p>
+    <div style="display:flex; gap:10px;">
+      <button onclick="doReset()" style="
+        flex:1; height:42px; background:#e03535; color:#fff; border:none;
+        border-radius:8px; font-size:.9rem; font-weight:600; cursor:pointer;">
+        はい
+      </button>
+      <button onclick="closeResetModal()" style="
+        flex:1; height:42px; background:#f0f0f0; color:#555; border:none;
+        border-radius:8px; font-size:.9rem; font-weight:500; cursor:pointer;">
+        いいえ
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════ ROSTER ══════════ -->
@@ -536,17 +572,57 @@ const SK = { players:'vbs_players', tournaments:'vbs_tournaments', opponents:'vb
 // ════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════
+function confirmReset() {
+  const m = document.getElementById('resetModal');
+  m.style.display = 'flex';
+}
+function closeResetModal() {
+  document.getElementById('resetModal').style.display = 'none';
+}
+function doReset() {
+  // フォームをリセット
+  document.getElementById('tournament').value = '';
+  document.getElementById('category').value = '男子';
+  document.getElementById('result').value = 'win';
+  document.getElementById('ourScore').value = 0;
+  document.getElementById('theirScore').value = 0;
+  document.getElementById('opponent').value = '';
+  document.getElementById('exScoreL').value = '';
+  document.getElementById('exScoreR').value = '';
+  document.getElementById('pkScoreL').value = '';
+  document.getElementById('pkScoreR').value = '';
+  document.getElementById('extraTag').value = '';
+  // 得点者行をリセット
+  scorerRows = [];
+  document.getElementById('scorerList').innerHTML = '';
+  addScorerRow();
+  // 写真リセット
+  clearPhoto();
+  // 出力非表示
+  document.getElementById('outputWrap').style.display = 'none';
+  closeResetModal();
+}
+
 function init() {
   initNumSelect('newPNum', 1, 99);
   initNumSelect('ourScore', 0, 30);
   initNumSelect('theirScore', 0, 30);
   ['exScoreL','exScoreR','pkScoreL','pkScoreR'].forEach(id => initNumSelectOptional(id, 0, 30));
 
-  players     = JSON.parse(localStorage.getItem(SK.players)     || 'null') || [
-    {num:1,  name:'林翔太郎'},
+  // 選手は常に最新の12名で上書き
+  players = [
+    {num:1,  name:'柳生理央輝'},
+    {num:4,  name:'鳥居祐希'},
+    {num:5,  name:'竹谷友希'},
+    {num:6,  name:'林翔太郎'},
     {num:7,  name:'吉田恭平'},
-    {num:10, name:'柳生理央輝'},
+    {num:8,  name:'小牧正幸'},
+    {num:9,  name:'鈴木嘉記'},
+    {num:10, name:'鈴木将人'},
     {num:11, name:'佐藤栄祐'},
+    {num:12, name:'宜野座寛也'},
+    {num:15, name:'波平将太'},
+    {num:21, name:'高見侑司'},
   ];
   tournaments = JSON.parse(localStorage.getItem(SK.tournaments) || 'null') || ['HEKINAN CUP 2025'];
   opponents   = JSON.parse(localStorage.getItem(SK.opponents)   || 'null') || [
