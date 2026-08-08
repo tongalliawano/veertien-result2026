@@ -566,6 +566,7 @@ let tournaments = [];
 let opponents   = [];   // {name, nameEn}
 let scorerRows  = [];
 let photoDataURL = null;
+let _lastDrawParams = null;
 
 const SK = { players:'vbs_players', tournaments:'vbs_tournaments', opponents:'vbs_opponents' };
 
@@ -850,9 +851,11 @@ function generate() {
   const resultEmoji = result==='win'?'⚪':result==='loss'?'⚫':'△';
   const validScorers = scorerRows.filter(s=>s.name);
 
-  // Icebergフォントが確実にロードされてから描画
+  const _params = {ourScore, theirScore, opponentEn, exScoreL, exScoreR, pkScoreL, pkScoreR};
+  _lastDrawParams = _params;
+  // フォントが確実にロードされてから描画
   document.fonts.load('400 110px Nova Round').then(() => {
-    drawCard({ourScore, theirScore, opponentEn, exScoreL, exScoreR, pkScoreL, pkScoreR});
+    drawCard(_params);
   });
   buildCaption({tournament, category, resultEmoji, ourScore, theirScore, opponent:opponentJa, scorers:validScorers, extraTag});
 
@@ -1011,11 +1014,44 @@ function buildCaption({tournament,category,resultEmoji,ourScore,theirScore,oppon
 }
 
 function downloadImage() {
+  const canvas = document.getElementById('scoreCard');
   const t = (document.getElementById('tournament').value||'match').replace(/[\s　]+/g,'_');
-  const a = document.createElement('a');
-  a.download = `veertienbs_${t}.png`;
-  a.href = document.getElementById('scoreCard').toDataURL('image/png');
-  a.click();
+  // 最新状態で再描画してからダウンロード
+  const d = _lastDrawParams;
+  if (d) {
+    drawCard(d, () => {
+      _doDownload(canvas, t);
+    });
+  } else {
+    _doDownload(canvas, t);
+  }
+}
+function _doDownload(canvas, t) {
+  try {
+    canvas.toBlob(blob => {
+      if (!blob) {
+        alert('画像の生成に失敗しました。もう一度「生成する」を押してからダウンロードしてください。');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = 'veertienbs_' + t + '.png';
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+    }, 'image/png');
+  } catch(e) {
+    try {
+      const a = document.createElement('a');
+      a.download = 'veertienbs_' + t + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    } catch(e2) {
+      alert('ダウンロードできませんでした。\nスクリーンショットで保存してください。');
+    }
+  }
 }
 
 function copyCaption() {
