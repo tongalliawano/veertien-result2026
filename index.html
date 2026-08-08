@@ -466,8 +466,12 @@ canvas#scoreCard{
   <div id="outputWrap" style="display:none;">
     <div class="output-grid">
       <div>
-        <canvas id="scoreCard" width="1080" height="1350"></canvas>
-        <button class="btn btn-outline" onclick="downloadImage()">↓ ダウンロード</button>
+        <canvas id="scoreCard" width="1080" height="1350" style="display:none;"></canvas>
+        <img id="scoreCardImg" style="width:100%;border-radius:10px;display:none;box-shadow:0 4px 12px rgba(0,0,0,.12);" alt="生成画像">
+        <p id="saveHint" style="display:none;font-size:.75rem;color:#888;text-align:center;margin-top:6px;">
+          📱 画像を長押し → 「写真に保存」で保存できます
+        </p>
+        <button class="btn btn-outline" id="downloadBtn" onclick="downloadImage()" style="margin-top:8px;">↓ ダウンロード / 保存</button>
       </div>
       <div>
         <div class="caption-box" id="captionOut"></div>
@@ -944,13 +948,29 @@ function drawCard(d) {
 
       // 3. スコア等を描画
       drawNumbers(ctx, d);
+      _updatePreviewImg();
+      if (onDone) onDone();
     };
     img.src = photoDataURL;
   } else {
     // 写真なし: ベース画像のみ
     ctx.drawImage(BASE_IMG, 0, 0, CW, CH);
     drawNumbers(ctx, d);
+    _updatePreviewImg();
+    if (onDone) onDone();
   }
+}
+
+function _updatePreviewImg() {
+  const canvas = document.getElementById('scoreCard');
+  const previewImg = document.getElementById('scoreCardImg');
+  const hint = document.getElementById('saveHint');
+  if (!previewImg) return;
+  try {
+    previewImg.src = canvas.toDataURL('image/png');
+    previewImg.style.display = 'block';
+    if (hint) hint.style.display = 'block';
+  } catch(e) {}
 }
 
 function drawNumbers(ctx, d) {
@@ -1016,42 +1036,51 @@ function buildCaption({tournament,category,resultEmoji,ourScore,theirScore,oppon
 function downloadImage() {
   const canvas = document.getElementById('scoreCard');
   const t = (document.getElementById('tournament').value||'match').replace(/[\s　]+/g,'_');
-  // 最新状態で再描画してからダウンロード
   const d = _lastDrawParams;
-  if (d) {
-    drawCard(d, () => {
-      _doDownload(canvas, t);
-    });
-  } else {
-    _doDownload(canvas, t);
-  }
-}
-function _doDownload(canvas, t) {
-  try {
-    canvas.toBlob(blob => {
-      if (!blob) {
-        alert('画像の生成に失敗しました。もう一度「生成する」を押してからダウンロードしてください。');
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.download = 'veertienbs_' + t + '.png';
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 3000);
-    }, 'image/png');
-  } catch(e) {
+
+  const doSave = () => {
+    // iOS/Android: imgタグを新しいタブで開いて長押し保存を促す
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     try {
-      const a = document.createElement('a');
-      a.download = 'veertienbs_' + t + '.png';
-      a.href = canvas.toDataURL('image/png');
-      a.click();
-    } catch(e2) {
-      alert('ダウンロードできませんでした。\nスクリーンショットで保存してください。');
+      canvas.toBlob(blob => {
+        if (!blob) { alert('もう一度「生成する」を押してください。'); return; }
+        const url = URL.createObjectURL(blob);
+        if (isMobile) {
+          // モバイル：新しいタブで画像を開く
+          const win = window.open('', '_blank');
+          if (win) {
+            win.document.write('<html><body style="margin:0;background:#000;"><img src="' + url + '" style="width:100%;"><p style="color:#fff;text-align:center;padding:10px;font-family:sans-serif;">長押し → 写真に保存</p></body></html>');
+            win.document.close();
+          } else {
+            // ポップアップブロック時はimgのsrcをそのまま使う
+            const previewImg = document.getElementById('scoreCardImg');
+            if (previewImg) {
+              previewImg.src = url;
+              alert('上の画像を長押しして「写真に保存」してください。');
+            }
+          }
+        } else {
+          // PC：通常ダウンロード
+          const a = document.createElement('a');
+          a.download = 'veertienbs_' + t + '.png';
+          a.href = url;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }, 'image/png');
+    } catch(e) {
+      const previewImg = document.getElementById('scoreCardImg');
+      if (previewImg && previewImg.src) {
+        alert('画像を長押しして「写真に保存」してください。');
+      } else {
+        alert('保存できませんでした。スクリーンショットで保存してください。');
+      }
     }
-  }
+  };
+
+  if (d) { drawCard(d, doSave); } else { doSave(); }
 }
 
 function copyCaption() {
